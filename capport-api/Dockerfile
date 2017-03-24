@@ -1,5 +1,14 @@
 # Using official python runtime base image
-FROM python:2.7-alpine
+FROM centos:centos7
+
+RUN yum -y install \
+            epel-release \
+            gcc \
+        	gcc-c++ \
+            python-devel \
+	        mariadb-devel && \
+    yum -y install \
+            python-pip
 
 # Set the application directory
 WORKDIR /app

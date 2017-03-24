@@ -1,5 +1,5 @@
-import json
-import redis
+import model.database
+import model.requirement
 import uuid
 import time
 
@@ -30,11 +30,13 @@ class Session:
     ## addRequirement will add a requirement to this session.
     def addRequirement(self,requirement):
         self.requirements.append(requirement)
+        requirement.store()
         return
 
     ## getRequirements will return a list of requirements objects that needs
     ## to be satisfied to gain access to the captive portal.
     def getRequirements(self):
+        self.requirements = model.requirement.getRequirements(self.uuid)
         return self.requirements
 
     ## metRequirments will check if all requirements are met, and will return true
@@ -70,7 +72,7 @@ class Session:
 
     ## isDepleated will check if the datalimit has been crossed given current usage.
     def isDepleated(self,usage):
-        if (self.datalimit > 0) and (current > self.datalimit):
+        if (self.datalimit > 0) and (usage > self.datalimit):
             return True
         return None
 
@@ -84,15 +86,26 @@ class Session:
             return None
         return True
 
-    ## store will store the Session object in redis.
+    ## store will store the Session object in mysql.
     def store(self):
-        ## TODO: store in redis
-        # serialize, including requirements
+        cnx = model.database.getCnx()
+        cursor = cnx.cursor()
+        query = ("INSERT INTO session SET uuid=%s,identity=%s,expire=%s,datalimit=%s")
+        cursor.execute(query,(self.uuid,self.identity,self.expire,self.datalimit))
+        cursor.close()
+        cnx.commit()
+        cnx.close()
         return
 
-    ## delete will delete the Session object from redis.
+    ## delete will delete the Session object from mysql.
     def delete(self):
-        ## TODO: delete from redis
+        cnx = model.database.getCnx()
+        cursor = cnx.cursor()
+        cursor.execute(("DELETE FROM session WHERE uuid=%s"),(self.uuid,))
+        cursor.execute(("DELETE FROM requirement WHERE uuid=%s"),(self.uuid,))
+        cursor.close()
+        cnx.commit()
+        cnx.close()
         return
 
 ## newSession will create a new session based on the given identity. The
@@ -105,4 +118,15 @@ def newSession(identity):
 
 ## loadSession will load a previously generated session, identified by the uuid.
 def loadSession(uuid):
-    return
+    cnx = model.database.getCnx()
+    cursor = cnx.cursor()
+    query = ("SELECT uuid,identity,expire,datalimit FROM session WHERE uuid=%s")
+    cursor.execute(query, (uuid,))
+    session = None
+    for (uuid,identity,expire,datalimit) in cursor:
+        session = Session(identity,uuid)
+        session.setExpire(expire)
+        session.setDataLimit(datalimit)
+    cursor.close()
+    cnx.close()
+    return session

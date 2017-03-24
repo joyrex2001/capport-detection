@@ -1,8 +1,9 @@
-from flask import Flask, request, json, jsonify, redirect, render_template
+from flask import Flask, request, json, redirect, render_template
 
 import os
 import time
 
+import model.database
 import model.session
 import model.requirement
 
@@ -99,6 +100,12 @@ def login():
     if (session_uuid is None):
         return app.send_static_file('invalid.html')
 
+    ## load the session with given session id
+    session = model.session.loadSession(session_uuid)
+    if (session is None):
+        return app.send_static_file('invalid.html')
+
+    ## check for password
     passwd = request.args.get('password')
     if (passwd is None):
         return render_template('login.html', session = session_uuid)
@@ -162,12 +169,14 @@ def post_sessions():
     ## add some requirements
 
     ## add view requirement for terms & conditions
-    terms = os.getenv( "CAPPORT_TERMS_URL", request.url_root+"terms?session="+session.getId())
+    terms = os.getenv( "CAPPORT_TERMS_URL", request.url_root+"terms")
+    terms = terms+"?session="+session.getId()
     req = model.requirement.newRequirement( session.getId(),"view_page",terms)
     session.addRequirement(req)
 
     ## add provide_credentials requirement for login page
-    login = os.getenv( "CAPPORT_LOGIN_URL", request.url_root+"login?session="+session.getId())
+    login = os.getenv( "CAPPORT_LOGIN_URL", request.url_root+"login")
+    login = login+"?session="+session.getId()
     req = model.requirement.newRequirement(session.getId(),"provide_credentials",login)
     session.addRequirement(req)
 
@@ -183,11 +192,11 @@ def post_sessions():
 # The session now exists, and GET works:
 # GET http://<server>/capport/sessions/<session_uuid> (Accept: application/json)
 # 200 OK
-@app.route('/capport/sessions/<session_uuid>',methods = ['GET'] )
+@app.route('/capport/sessions/<string:session_uuid>',methods = ['GET'] )
 def get_sessions(session_uuid):
-    ## session status as html not implemented in this example
-    if not request_wants_json():
-        return app.send_static_file('htdocs/index.html')
+    ## TODO: session status as html not implemented in this example
+    # if not request_wants_json():
+    #    return app.send_static_file('index.html')
 
     ## load the session with given session id
     session = model.session.loadSession(session_uuid)
@@ -199,7 +208,7 @@ def get_sessions(session_uuid):
 # When the client wants to explicitly leave the network, delete the href for the session:
 # DELETE http://<server>/capport/sessions/<session_uuid>
 # 200 OK
-@app.route('/capport/sessions/<session_uuid>',methods = ['DELETE'] )
+@app.route('/capport/sessions/<string:session_uuid>',methods = ['DELETE'] )
 def delete_sessions(session_uuid):
     ## load the session with given session id
     session = model.session.loadSession(session_uuid)
@@ -217,4 +226,5 @@ def delete_sessions(session_uuid):
 ##################
 
 if __name__ == "__main__":
+    model.database.initDatabase()
     app.run(host="0.0.0.0")

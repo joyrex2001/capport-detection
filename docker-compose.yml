@@ -11,18 +11,31 @@ services:
       CAPPORT_LOGIN_URL: "http://localhost:5000/login"
       CAPPORT_TERMS_URL: "http://localhost:5000/terms"
       CAPPORT_CREATE_SESSION_URL: "http://localhost:5000/capport/sessions"
+      MYSQL_DATABASE: capport
+      MYSQL_HOST: mysql
+      MYSQL_USER: capport
+      MYSQL_PASSWORD: capport
     ports:
       - "5000:5000"
     networks:
       - front-tier
       - back-tier
-
-  redis:
-    image: redis:alpine
-    container_name: redis
-    ports: ["6379"]
+    depends_on:
+      - mysql
+      
+  mysql:
+    image: mysql:5.6
+    volumes:
+      - "./.data/db:/var/lib/mysql"
+    environment:
+      MYSQL_ROOT_PASSWORD: capport
+      MYSQL_DATABASE: capport
+      MYSQL_USER: capport
+      MYSQL_PASSWORD: capport
+    ports:
+      - "3306:3306"
     networks:
-      - back-tier
+        - back-tier
 
 networks:
   front-tier:
