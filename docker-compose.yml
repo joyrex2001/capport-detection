@@ -8,6 +8,8 @@ services:
     environment:
       FLASK_DEBUG: 1
       CAPPORT_BROWSE_URL: "http://localhost:5000/"
+      CAPPORT_LOGIN_URL: "http://localhost:5000/login"
+      CAPPORT_TERMS_URL: "http://localhost:5000/terms"
       CAPPORT_CREATE_SESSION_URL: "http://localhost:5000/capport/sessions"
     ports:
       - "5000:5000"

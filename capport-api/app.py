@@ -1,5 +1,7 @@
 from flask import Flask, request, json, jsonify, redirect, render_template
+
 import os
+import time
 
 import model.session
 import model.requirement
@@ -10,6 +12,41 @@ app = Flask(__name__)
 ## helper methods ##
 ####################
 
+## get_usage will query the current data usage for this subscriber
+def get_usage(identity):
+    ## TODO: some implementation to get current data usage
+    return 0
+
+## enable_traffic will disable the captive portal
+def enable_traffic(identity):
+    ## TODO: all requirements are met, signal pcef?
+    return
+
+## session_status will return the current state of the session as a json
+## object.
+def session_status(session):
+    usage = get_usage(session.getIdentity())
+    struct = {
+        "id": { "uuid": session.getId(),
+                "href": request.url_root+"capport/sessions/"+session.getId() },
+        "identity": session.getIdentity(),
+        "state": { "permitted": bool(session.isPermitted(usage)) }
+    }
+
+    if (session.isPermitted(usage) is True):
+        struct['state']['expires'] = time.strftime("%Y-%m-%dT%H:%M:%S+00:00",time.gmtime(session.getExpire()))
+        struct['token'] = session.getToken()
+        if session.getDataLimit()>0:
+            struct['state']['bytes_remaining'] = session.getDataLimit()-usage
+
+    reqs = session.getRequirements()
+    struct['requirements'] = []
+    for i in range(len(reqs)):
+        struct['requirements'].append({ reqs[i].getType(): reqs[i].getUrl() })
+    return (json.dumps(struct),200)
+
+## request_wants_json will check the accept headers to determine wether a
+## json response is more appropriate.
 def request_wants_json():
     best = request.accept_mimetypes \
         .best_match(['application/json', 'text/html'])
@@ -28,7 +65,7 @@ def index():
 # terms page; check for if terms were accepted and delete requirement.
 @app.route('/terms')
 def terms():
-    session_uuid = request.GET['session']
+    session_uuid = request.args.get('session')
     if (session_uuid is None):
         return app.send_static_file('invalid.html')
 
@@ -38,24 +75,44 @@ def terms():
         return app.send_static_file('invalid.html')
 
     ## check if terms
-    accept = request.GET['accept']
-    if (session is None):
-        return app.send_static_file('terms.html')
+    accept = request.args.get('accept')
+    if (accept is None):
+        return render_template('terms.html', session = session_uuid)
 
-    ## TODO: delete requirement
-    ## TODO: check if all requirements are met; -> signal pcef?
+    ## IDEA: this is probably not the best way to address requirements,
+    ## it might be better if they have a unique id instead. The semantic
+    ## doesn't add value in this implementation...
+    req = model.requirement.loadRequirement(session_uuid,"view_page")
+    if (req is not None):
+        req.delete()
+
+    ## all requirements are met, disable captive portal
+    if (session.metRequirements() is True):
+        enable_traffic(session.getIdentity())
 
     return app.send_static_file('accepted.html')
 
 # login page; check for if password was given and delete requirement.
-@app.route('/<session_uuid>/login')
+@app.route('/login')
 def login():
-    passwd = request.POST['password']
-    if (passwd is None):
-        return app.send_static_file('login.html')
+    session_uuid = request.args.get('session')
+    if (session_uuid is None):
+        return app.send_static_file('invalid.html')
 
-    ## TODO: delete requirement
-    ## TODO: check if all requirements are met; -> signal pcef?
+    passwd = request.args.get('password')
+    if (passwd is None):
+        return render_template('login.html', session = session_uuid)
+
+    ## IDEA: this is probably not the best way to address requirements,
+    ## it might be better if they have a unique id instead. The semantic
+    ## doesn't add value in this implementation...
+    req = model.requirement.loadRequirement(session_uuid,"provide_credentials")
+    if (req is not None):
+        req.delete()
+
+    ## all requirements are met, disable captive portal
+    if (session.metRequirements() is True):
+        enable_traffic(session.getIdentity())
 
     return app.send_static_file('welcome.html')
 
@@ -72,7 +129,7 @@ def capport():
     create = os.getenv( "CAPPORT_CREATE_SESSION_URL",
                         request.url_root+"capport/sessions")
     browse = os.getenv( "CAPPORT_BROWSE_URL",
-                        "http://portal.example.com/" )
+                        request.url_root )
 
     ## in case of json, return the urls
     if request_wants_json():
@@ -104,15 +161,24 @@ def post_sessions():
 
     ## add some requirements
 
-    req1 = model.requirement.newRequirement(session.getId(),"view_page")
-    req2 = model.requirement.newRequirement(session.getId(),"provide_credentials")
+    ## add view requirement for terms & conditions
+    terms = os.getenv( "CAPPORT_TERMS_URL", request.url_root+"terms?session="+session.getId())
+    req = model.requirement.newRequirement( session.getId(),"view_page",terms)
+    session.addRequirement(req)
 
-    session.addRequirement(req1)
-    session.addRequirement(req2)
+    ## add provide_credentials requirement for login page
+    login = os.getenv( "CAPPORT_LOGIN_URL", request.url_root+"login?session="+session.getId())
+    req = model.requirement.newRequirement(session.getId(),"provide_credentials",login)
+    session.addRequirement(req)
 
-    ## TODO: return session status
+    ## set limits
+    session.setExpire(time.time()+3600) # let's do 1 hour..
+    session.setDataLimit(10000000) # let's do 1 hour..
 
-    return ("", 204)
+    ## store in redis
+    session.store()
+
+    return session_status(session)
 
 # The session now exists, and GET works:
 # GET http://<server>/capport/sessions/<session_uuid> (Accept: application/json)
@@ -128,9 +194,7 @@ def get_sessions(session_uuid):
     if (session is None):
         return (json.dumps({ "error": "invalid session" }), 500)
 
-    ## TODO: return session status
-
-    return ("", 204)
+    return session_status(session)
 
 # When the client wants to explicitly leave the network, delete the href for the session:
 # DELETE http://<server>/capport/sessions/<session_uuid>

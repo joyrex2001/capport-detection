@@ -1,20 +1,23 @@
-#   "requirements": [
-#     {"view_page": "http://portal.example.com/welcome/terms_and_conditions.html?session=<session_uuid>"},
-#     {"provide_credentials": "http://<server>/capport/sessions/<session_uuid>/credentials"}]
-
 class Requirement:
 
-    def __init__(self,uuid,reqtype):
+    def __init__(self,uuid,reqtype,url):
         self.uuid = uuid
         self.type = reqtype
+        self.url = url
         return
+
+    def getType(self):
+        return self.type
+
+    def getUrl(self):
+        return self.url
 
     ## delete will delete the requirement from redis.
     def delete(self):
         return
 
-def newRequirement(uuid,reqtype):
-    req = Requirement(uuid,reqtype)
+def newRequirement(uuid,reqtype,url):
+    req = Requirement(uuid,reqtype,url)
     return req
 
 def loadRequirement(uuid,reqtype):
