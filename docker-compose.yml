@@ -1,0 +1,27 @@
+version: "2"
+
+services:
+  capport-api:
+    build: ./capport-api/.
+    volumes:
+      - ./capport-api:/app
+    environment:
+      FLASK_DEBUG: 1
+      CAPPORT_BROWSE_URL: "http://localhost:5000/"
+      CAPPORT_CREATE_SESSION_URL: "http://localhost:5000/capport/sessions"
+    ports:
+      - "5000:5000"
+    networks:
+      - front-tier
+      - back-tier
+
+  redis:
+    image: redis:alpine
+    container_name: redis
+    ports: ["6379"]
+    networks:
+      - back-tier
+
+networks:
+  front-tier:
+  back-tier:
