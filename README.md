@@ -9,13 +9,36 @@ that were given on this draft.
 
 The capport api is written in Python, and uses MySQL/mariadb for the storage of the
 sessions. The accompanied docker-compose file will set-up a complete
-environment, however the capport-api can also run without it (as long as
-redis is available, and the python dependecies are installed as well
-```pip install -r capport-api/requirements.txt```).
+environment, however the capport-api can also run without it.
+
+## Run with docker-compose
 
 To start with docker-compose: ```docker-compose up --force-recreate```.
 
-To start without docker-compose: ```cd capport-api; python app.py```
+## Run without docker compose
+
+This proof of concept can also run without docker, but requires some manual installation
+of the dependencies.
+
+On centos7, install the following:
+```bash
+yum -y install epel-release gcc gcc-c++ python-devel mariadb-devel mariadb-server
+yum -y install python-pip
+pip install -r capport-api/requirements.txt
+```
+
+Create the database, and add a default user:
+```bash
+sudo systemctl start mariadb
+sudo mysql
+MariaDB [(none)]> CREATE DATABASE capport CHARACTER SET utf8 COLLATE
+utf8_unicode_ci;
+MariaDB [(none)]> GRANT ALL PRIVILEGES ON capport.* TO 'capport'@'%' IDENTIFIED
+BY 'capport';
+```
+
+Finally, to start the service:
+```cd capport-api; python app.py```.
 
 # Accessing the api
 
