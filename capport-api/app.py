@@ -61,6 +61,11 @@ def request_wants_json():
 
 @app.route('/')
 def index():
+    ## TODO: this is the entry-point to an 'old-fashioned' captive portal, e.g.
+    ## when the api is called without the 'application/json' accept header.
+    ## I am not sure if this should be an identical implementation as the api
+    ## implementation, maybe this could be implemented as it is done in current
+    ## captive portals).
     return app.send_static_file('index.html')
 
 # terms page; check for if terms were accepted and delete requirement.
@@ -181,8 +186,8 @@ def post_sessions():
     session.addRequirement(req)
 
     ## set limits
-    session.setExpire(time.time()+3600) # let's do 1 hour..
-    session.setDataLimit(10000000) # let's do 1 hour..
+    session.setExpire(time.time()+3600) # let's do 1 hour...
+    session.setDataLimit(10000000) # let's do 10000000 bytes...
 
     ## store in redis
     session.store()
