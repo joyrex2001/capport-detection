@@ -3,9 +3,9 @@ FROM centos:centos7
 RUN yum -y install \
             epel-release \
             gcc \
-        	gcc-c++ \
+            gcc-c++ \
             python-devel \
-	        mariadb-devel && \
+            mariadb-devel && \
     yum -y install \
             python-pip
 
